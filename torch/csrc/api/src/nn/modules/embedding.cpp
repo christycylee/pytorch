@@ -18,8 +18,6 @@ EmbeddingImpl::EmbeddingImpl(const EmbeddingOptions& options_) : options(options
 }
 
 void EmbeddingImpl::reset() {
-  TORCH_CHECK(options.num_embeddings(), "num_embeddings needs to be specified in options");
-  TORCH_CHECK(options.embedding_dim(), "embedding_dim needs to be specified in options");
   if (options.padding_idx() != c10::nullopt) {
     if (*options.padding_idx() > 0) {
       TORCH_CHECK(*options.padding_idx() < *options.num_embeddings(), "Padding_idx must be within num_embeddings");
@@ -66,7 +64,14 @@ void EmbeddingImpl::pretty_print(std::ostream& stream) const {
 }
 
 torch::Tensor EmbeddingImpl::forward(const Tensor& input) {
-  return F::embedding(input, weight, options);
+  return detail::embedding(
+    input,
+    weight,
+    options.padding_idx(),
+    options.max_norm(),
+    options.norm_type(),
+    options.scale_grad_by_freq(),
+    options.sparse());
 }
 
 EmbeddingBagImpl::EmbeddingBagImpl(const EmbeddingBagOptions& options_) : options(options_) { // NOLINT(modernize-pass-by-value)
@@ -74,8 +79,6 @@ EmbeddingBagImpl::EmbeddingBagImpl(const EmbeddingBagOptions& options_) : option
 }
 
 void EmbeddingBagImpl::reset() {
-  TORCH_CHECK(options.num_embeddings(), "num_embeddings needs to be specified in options");
-  TORCH_CHECK(options.embedding_dim(), "embedding_dim needs to be specified in options");
   if (!options._weight().defined()) {
     weight = register_parameter(
         "weight", torch::empty({*options.num_embeddings(), *options.embedding_dim()}));
@@ -89,7 +92,16 @@ void EmbeddingBagImpl::reset() {
 }
 
 torch::Tensor EmbeddingBagImpl::forward(const Tensor& input, const Tensor& offsets, const Tensor& per_sample_weights) {
-  return F::embedding_bag(input, weight, EmbeddingBagOptions(options), offsets, per_sample_weights);
+  return detail::embedding_bag(
+    input,
+    weight,
+    offsets,
+    options.max_norm(),
+    options.norm_type(),
+    options.scale_grad_by_freq(),
+    options.mode(),
+    options.sparse(),
+    per_sample_weights);
 }
 
 void EmbeddingBagImpl::pretty_print(std::ostream& stream) const {
